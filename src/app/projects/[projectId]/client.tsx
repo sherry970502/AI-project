@@ -381,9 +381,9 @@ export function PlannerClient({ project }: { project: ProjectFull }) {
     } else if (next?.type === 'build_exec_tasks') {
       const tasks: ExecTaskWithMessages[] = next.execTasks.map((t: ExecTask) => ({ ...t, messages: [] }))
       dispatch({ type: 'ADD_EXEC_TASKS', tasks })
-      // Only auto-start first task if it's new (no existing exec tasks were already running)
-      const hadNoTasks = state.execTasks.length === 0
-      if (hadNoTasks && tasks[0]) setTimeout(() => runExecTask(tasks[0].id), 300)
+      // Auto-start the first IDLE task (works for both first run and re-decompose)
+      const firstIdle = tasks.find(t => t.status === 'IDLE')
+      if (firstIdle) setTimeout(() => runExecTask(firstIdle.id), 300)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.id])
