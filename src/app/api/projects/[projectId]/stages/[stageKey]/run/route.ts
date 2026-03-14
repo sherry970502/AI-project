@@ -32,7 +32,6 @@ export async function POST(
         })
 
         if (!stage) { send({ type: 'error', message: 'Stage not found' }); controller.close(); return }
-        if (stage.status === 'LOCKED') { send({ type: 'error', message: 'Stage already locked' }); controller.close(); return }
 
         const history: { role: 'user' | 'assistant'; content: string }[] = []
 
@@ -58,7 +57,7 @@ export async function POST(
 
           // Ensure history ends with a user message
           if (history.length > 0 && history[history.length - 1].role === 'assistant') {
-            const resumeMsg = '请根据最新的项目背景和知识库，重新生成输出。'
+            const resumeMsg = '请根据以上反馈，重新输出更新后的完整文档内容。'
             await prisma.message.create({ data: { stageId: stage.id, role: 'USER', content: resumeMsg } })
             history.push({ role: 'user', content: resumeMsg })
           }

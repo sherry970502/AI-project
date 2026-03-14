@@ -373,11 +373,17 @@ export function PlannerClient({ project }: { project: ProjectFull }) {
 
     const next = data.nextAction
     if (next?.type === 'next_stage') {
-      setTimeout(() => runStage(next.stageKey), 300)
+      // Only auto-start next stage if it hasn't been started yet
+      const nextStatus = state.statuses[next.stageKey] ?? 'IDLE'
+      if (nextStatus === 'IDLE') {
+        setTimeout(() => runStage(next.stageKey), 300)
+      }
     } else if (next?.type === 'build_exec_tasks') {
       const tasks: ExecTaskWithMessages[] = next.execTasks.map((t: ExecTask) => ({ ...t, messages: [] }))
       dispatch({ type: 'ADD_EXEC_TASKS', tasks })
-      if (tasks[0]) setTimeout(() => runExecTask(tasks[0].id), 300)
+      // Only auto-start first task if it's new (no existing exec tasks were already running)
+      const hadNoTasks = state.execTasks.length === 0
+      if (hadNoTasks && tasks[0]) setTimeout(() => runExecTask(tasks[0].id), 300)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.id])
