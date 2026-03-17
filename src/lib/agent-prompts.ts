@@ -74,8 +74,14 @@ export function getAgentSystemPrompt(stageKey: string): string {
   return SYSTEM_PROMPTS[stageKey as StageKey] ?? ''
 }
 
-export function getExecTaskSystemPrompt(taskName: string, outputDesc: string): string {
+export function getExecTaskSystemPrompt(taskName: string, outputDesc: string, projectContext: string): string {
   return `你是一个执行Agent。你的职责是完成一个具体的项目任务，直接生成可以使用的产出物。
+
+当前任务：${taskName}
+产出要求：${outputDesc}
+
+项目背景：
+${projectContext}
 
 规则：
 1. 直接生成产出物，不是建议，不是框架，是可以直接使用的内容

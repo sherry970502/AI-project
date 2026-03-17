@@ -36,9 +36,11 @@ export async function POST(
 
         const history: { role: 'user' | 'assistant'; content: string }[] = []
 
+        // Context always goes into system prompt — never into chat messages
+        const ctx = await buildContext(task.projectId)
+
         if (task.messages.length === 0) {
-          const ctx = await buildContext(task.projectId)
-          const firstMsg = `项目背景：\n${ctx}\n\n任务名称：${task.name}\n要求产出：${task.outputDesc}\n\n请直接生成产出物。`
+          const firstMsg = `请开始执行任务【${task.name}】，直接生成产出物。`
           await prisma.message.create({ data: { execTaskId: task.id, role: 'USER', content: firstMsg } })
           history.push({ role: 'user', content: firstMsg })
         } else {
@@ -58,7 +60,7 @@ export async function POST(
 
           // Ensure history ends with a user message
           if (history.length > 0 && history[history.length - 1].role === 'assistant') {
-            const resumeMsg = '请根据最新的项目背景和知识库，重新生成此任务的产出。'
+            const resumeMsg = '请结合项目背景和知识库，重新生成此任务的产出。'
             await prisma.message.create({ data: { execTaskId: task.id, role: 'USER', content: resumeMsg } })
             history.push({ role: 'user', content: resumeMsg })
           }
@@ -67,7 +69,7 @@ export async function POST(
         await prisma.execTask.update({ where: { id: task.id }, data: { status: 'RUNNING' } })
 
         const fullContent = await streamCompletion(
-          getExecTaskSystemPrompt(task.name, task.outputDesc),
+          getExecTaskSystemPrompt(task.name, task.outputDesc, ctx),
           history,
           text => send({ type: 'chunk', text })
         )
