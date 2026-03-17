@@ -70,8 +70,10 @@ const SYSTEM_PROMPTS: Record<StageKey, string> = {
 语言：中文，判断清晰`,
 }
 
-export function getAgentSystemPrompt(stageKey: string): string {
-  return SYSTEM_PROMPTS[stageKey as StageKey] ?? ''
+export function getAgentSystemPrompt(stageKey: string, projectContext?: string): string {
+  const base = SYSTEM_PROMPTS[stageKey as StageKey] ?? ''
+  if (!projectContext) return base
+  return `${base}\n\n项目背景：\n${projectContext}`
 }
 
 export function getExecTaskSystemPrompt(taskName: string, outputDesc: string, projectContext: string): string {

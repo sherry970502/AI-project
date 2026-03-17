@@ -14,6 +14,7 @@ export function DashboardClient({ projects, user }: { projects: Project[]; user:
   const router = useRouter()
   const [creating, setCreating] = useState(false)
   const [desc, setDesc] = useState('')
+  const [initialMaterial, setInitialMaterial] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function createProject() {
@@ -23,7 +24,7 @@ export function DashboardClient({ projects, user }: { projects: Project[]; user:
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: desc }),
+        body: JSON.stringify({ description: desc, initialMaterial: initialMaterial.trim() || undefined }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const project = await res.json()
@@ -87,6 +88,23 @@ export function DashboardClient({ projects, user }: { projects: Project[]; user:
               }}
               onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) createProject() }}
             />
+            <label className="font-mono text-xs tracking-widest uppercase mt-1" style={{ color: 'var(--p-text-dim)' }}>
+              初始材料（可选）
+              <span className="ml-2 normal-case tracking-normal font-sans" style={{ color: 'var(--p-text-dim)', opacity: 0.6 }}>
+                粘贴会议纪要、背景资料等，校准 Agent 将优先参考
+              </span>
+            </label>
+            <textarea
+              value={initialMaterial}
+              onChange={e => setInitialMaterial(e.target.value)}
+              placeholder="粘贴文本内容..."
+              rows={4}
+              className="w-full text-sm leading-relaxed resize-none outline-none p-4"
+              style={{
+                background: 'var(--p-surface2)', border: '1px solid var(--p-border2)',
+                color: 'var(--p-text)', borderRadius: '2px', fontFamily: 'var(--font-serif)',
+              }}
+            />
             <div className="flex gap-3">
               <button
                 onClick={createProject}
@@ -97,7 +115,7 @@ export function DashboardClient({ projects, user }: { projects: Project[]; user:
                 {loading ? '创建中...' : '开始规划 →'}
               </button>
               <button
-                onClick={() => { setCreating(false); setDesc('') }}
+                onClick={() => { setCreating(false); setDesc(''); setInitialMaterial('') }}
                 className="font-mono text-xs px-4 py-2 cursor-pointer"
                 style={{ color: 'var(--p-text-dim)' }}
               >

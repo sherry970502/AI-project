@@ -35,9 +35,11 @@ export async function POST(
 
         const history: { role: 'user' | 'assistant'; content: string }[] = []
 
+        // Context always goes into system prompt — never into chat messages
+        const ctx = await buildContext(projectId)
+
         if (stage.messages.length === 0) {
-          const ctx = await buildContext(projectId)
-          const firstMsg = `${ctx}\n\n请开始执行你的职责。`
+          const firstMsg = '请开始执行你的职责。'
           await prisma.message.create({ data: { stageId: stage.id, role: 'USER', content: firstMsg } })
           history.push({ role: 'user', content: firstMsg })
         } else {
@@ -57,7 +59,7 @@ export async function POST(
 
           // Ensure history ends with a user message
           if (history.length > 0 && history[history.length - 1].role === 'assistant') {
-            const resumeMsg = '请根据以上反馈，重新输出更新后的完整文档内容。'
+            const resumeMsg = '请结合项目背景和知识库，重新输出更新后的完整文档内容。'
             await prisma.message.create({ data: { stageId: stage.id, role: 'USER', content: resumeMsg } })
             history.push({ role: 'user', content: resumeMsg })
           }
@@ -66,7 +68,7 @@ export async function POST(
         await prisma.pipelineStage.update({ where: { id: stage.id }, data: { status: 'RUNNING' } })
 
         const fullContent = await streamCompletion(
-          getAgentSystemPrompt(stageKey),
+          getAgentSystemPrompt(stageKey, ctx),
           history,
           text => send({ type: 'chunk', text })
         )

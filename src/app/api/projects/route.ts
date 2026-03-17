@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { title, description } = await req.json()
+  const { title, description, initialMaterial } = await req.json()
   if (!description?.trim()) return NextResponse.json({ error: 'Description required' }, { status: 400 })
 
   const project = await prisma.project.create({
@@ -36,6 +36,15 @@ export async function POST(req: NextRequest) {
           { stageKey: 'monitor',   status: 'IDLE' },
         ],
       },
+      ...(initialMaterial?.trim() ? {
+        knowledgeEntries: {
+          create: [{
+            type: 'NOTE',
+            title: '初始材料',
+            content: initialMaterial.trim(),
+          }],
+        },
+      } : {}),
     },
     include: { stages: true },
   })
