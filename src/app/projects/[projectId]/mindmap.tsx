@@ -39,7 +39,8 @@ function layoutTree(root: TreeNode): LayoutNode[] {
   function place(node: TreeNode, depth: number, yStart: number, parentId?: string): number {
     const x = PAD + depth * (NW + HGAP)
 
-    if (node.children.length === 0) {
+    const children = Array.isArray(node.children) ? node.children : []
+    if (children.length === 0) {
       const y = yStart + NH / 2
       result.push({ id: node.id, title: node.title, summary: node.summary, x, y, depth, parentId })
       return yStart + NH + VGAP
@@ -47,10 +48,10 @@ function layoutTree(root: TreeNode): LayoutNode[] {
 
     let childY = yStart
     const childCenters: number[] = []
-    for (const child of node.children) {
+    for (const child of children) {
       const childEnd = place(child, depth + 1, childY, node.id)
-      const childNode = result.find(n => n.id === child.id)!
-      childCenters.push(childNode.y)
+      const childNode = result.find(n => n.id === child.id)
+      if (childNode) childCenters.push(childNode.y)
       childY = childEnd
     }
 

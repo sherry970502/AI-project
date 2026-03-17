@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { setGlobalDispatcher, ProxyAgent } from 'undici'
 
 const MODEL = 'claude-sonnet-4-6'
-const MAX_TOKENS = 4096
+const MAX_TOKENS = 8192
 
 // 设置全局代理（影响所有 fetch 请求，包括 Anthropic SDK 的流式调用）
 const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY
