@@ -16,7 +16,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         include: { messages: { orderBy: { createdAt: 'asc' } } },
       },
       execTasks: {
-        include: { messages: { orderBy: { createdAt: 'asc' } } },
+        include: {
+          messages: { orderBy: { createdAt: 'asc' } },
+          actionItems: { orderBy: { createdAt: 'asc' } },
+        },
         orderBy: { order: 'asc' },
       },
       lockedDocs: { orderBy: [{ order: 'asc' }, { version: 'asc' }] },

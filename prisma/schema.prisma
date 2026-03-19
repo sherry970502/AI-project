@@ -111,8 +111,22 @@ model ExecTask {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   messages      Message[]
+  actionItems   ActionItem[]
 
   @@index([projectId, order])
+}
+
+// ── ACTION ITEM ────────────────────────────────────────────────────────────
+
+model ActionItem {
+  id         String   @id @default(cuid())
+  execTaskId String
+  execTask   ExecTask @relation(fields: [execTaskId], references: [id], onDelete: Cascade)
+  content    String
+  completed  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([execTaskId])
 }
 
 // ── MESSAGE ───────────────────────────────────────────────────────────────

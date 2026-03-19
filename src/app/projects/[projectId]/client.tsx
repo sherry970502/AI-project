@@ -4,7 +4,7 @@ import { useReducer, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, ArrowLeft, BookOpen, Plus, Trash2, Upload, X, MessageCircle, Send } from 'lucide-react'
 import { MindMapButton } from './mindmap'
-import type { Project, PipelineStage, ExecTask as ExecTaskPrisma, Message, LockedDocument, KnowledgeEntry, ConciergeMessage } from '@prisma/client'
+import type { Project, PipelineStage, ExecTask as ExecTaskPrisma, Message, LockedDocument, KnowledgeEntry, ConciergeMessage, ActionItem } from '@prisma/client'
 type ExecTask = ExecTaskPrisma & { marker?: string | null }
 import { STAGE_META, EXEC_AGENT_COLOR } from '@/lib/agent-prompts'
 
@@ -15,7 +15,7 @@ type NoteMessage = { id: string; role: 'NOTE'; content: string; stageId: null; e
 type DisplayMessage = MessageRow | NoteMessage
 
 type StageWithMessages = PipelineStage & { messages: MessageRow[] }
-type ExecTaskWithMessages = ExecTask & { messages: MessageRow[] }
+type ExecTaskWithMessages = ExecTask & { messages: MessageRow[]; actionItems: ActionItem[] }
 type ProjectFull = Project & {
   stages: StageWithMessages[]
   execTasks: ExecTaskWithMessages[]
@@ -36,6 +36,7 @@ interface PlannerState {
   lockedDocs: LockedDocument[]
   execTasks: ExecTaskWithMessages[]
   knowledgeEntries: KnowledgeEntry[]
+  actionItemsByTask: Record<string, ActionItem[]>
   error: string | null
 }
 
@@ -54,10 +55,13 @@ type Action =
   | { type: 'RESET_STAGE'; key: AgentKey }
   | { type: 'SET_ERROR'; msg: string | null }
   | { type: 'CLEAR_STREAMING' }
+  | { type: 'SET_ACTION_ITEMS'; taskId: string; items: ActionItem[] }
+  | { type: 'TOGGLE_ACTION_ITEM'; taskId: string; itemId: string; completed: boolean }
 
 function buildInitialState(project: ProjectFull): PlannerState {
   const conversations: Record<string, MessageRow[]> = {}
   const statuses: Record<string, string> = {}
+  const actionItemsByTask: Record<string, ActionItem[]> = {}
 
   for (const s of project.stages) {
     conversations[s.stageKey] = s.messages
@@ -67,6 +71,7 @@ function buildInitialState(project: ProjectFull): PlannerState {
     const key = `exec-${t.id}`
     conversations[key] = t.messages
     statuses[key] = t.status
+    actionItemsByTask[t.id] = t.actionItems ?? []
   }
 
   return {
@@ -79,6 +84,7 @@ function buildInitialState(project: ProjectFull): PlannerState {
     lockedDocs: project.lockedDocs,
     execTasks: project.execTasks,
     knowledgeEntries: project.knowledgeEntries,
+    actionItemsByTask,
     error: null,
   }
 }
@@ -93,6 +99,18 @@ function reducer(state: PlannerState, action: Action): PlannerState {
       return { ...state, streamingKey: null }
     case 'CLEAR_STREAMING':
       return { ...state, streamingText: '', streamingKey: null }
+    case 'SET_ACTION_ITEMS':
+      return { ...state, actionItemsByTask: { ...state.actionItemsByTask, [action.taskId]: action.items } }
+    case 'TOGGLE_ACTION_ITEM':
+      return {
+        ...state,
+        actionItemsByTask: {
+          ...state.actionItemsByTask,
+          [action.taskId]: (state.actionItemsByTask[action.taskId] ?? []).map(item =>
+            item.id === action.itemId ? { ...item, completed: action.completed } : item
+          ),
+        },
+      }
     case 'SET_STATUS':
       return { ...state, statuses: { ...state.statuses, [action.key]: action.status } }
     case 'PUSH_MESSAGE':
@@ -218,6 +236,18 @@ export function PlannerClient({ project }: { project: ProjectFull }) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const execTasksRef = useRef(state.execTasks)
   useEffect(() => { execTasksRef.current = state.execTasks }, [state.execTasks])
+
+  async function toggleActionItem(taskId: string, itemId: string, completed: boolean) {
+    dispatch({ type: 'TOGGLE_ACTION_ITEM', taskId, itemId, completed })
+    await fetch(`/api/exec-tasks/${taskId}/action-items/${itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed }),
+    }).catch(() => {
+      // revert on failure
+      dispatch({ type: 'TOGGLE_ACTION_ITEM', taskId, itemId, completed: !completed })
+    })
+  }
 
   useEffect(() => {
     if (conciergeOpen) requestAnimationFrame(() => {
@@ -416,6 +446,10 @@ export function PlannerClient({ project }: { project: ProjectFull }) {
           role: 'ASSISTANT', content: fullText, createdAt: new Date(),
         }
         dispatch({ type: 'PUSH_MESSAGE', key, msg: fakeMsg })
+        fetch(`/api/exec-tasks/${taskId}/action-items`)
+          .then(r => r.json())
+          .then((items: ActionItem[]) => dispatch({ type: 'SET_ACTION_ITEMS', taskId, items }))
+          .catch(() => {})
       },
       msg => { dispatch({ type: 'SET_ERROR', msg }); dispatch({ type: 'CLEAR_STREAMING' }) }
     )
@@ -699,6 +733,39 @@ export function PlannerClient({ project }: { project: ProjectFull }) {
               </div>
             )}
           </div>
+
+          {/* Action items */}
+          {isExec && currentTask && (() => {
+            const items = state.actionItemsByTask[currentTask.id] ?? []
+            if (items.length === 0) return null
+            const doneCount = items.filter(i => i.completed).length
+            return (
+              <div className="shrink-0 px-6 py-3" style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-surface2)' }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-mono" style={{ fontSize: '9px', letterSpacing: '0.12em', color: 'var(--p-text-dim)' }}>人工待办</span>
+                  <span className="font-mono" style={{ fontSize: '9px', color: doneCount === items.length ? 'var(--p-success)' : 'var(--p-accent)' }}>
+                    {doneCount}/{items.length}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {items.map(item => (
+                    <label key={item.id} className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={item.completed}
+                        onChange={e => toggleActionItem(currentTask.id, item.id, e.target.checked)}
+                        className="mt-0.5 shrink-0"
+                        style={{ accentColor: 'var(--p-accent)' }}
+                      />
+                      <span className="text-xs leading-relaxed" style={{ color: item.completed ? 'var(--p-text-dim)' : 'var(--p-text)', textDecoration: item.completed ? 'line-through' : 'none' }}>
+                        {item.content}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Input bar */}
           <div

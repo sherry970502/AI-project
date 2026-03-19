@@ -6,6 +6,17 @@ import { getExecTaskSystemPrompt } from '@/lib/agent-prompts'
 import { buildContext } from '@/lib/build-context'
 import { streamCompletion } from '@/lib/anthropic'
 
+function parseActionItems(content: string): { cleanContent: string; items: string[] } {
+  const match = content.match(/===人工待办===\n([\s\S]*?)\n===END===/)
+  if (!match) return { cleanContent: content, items: [] }
+  const items = match[1]
+    .split('\n')
+    .map(l => l.replace(/^[-•]\s*/, '').trim())
+    .filter(Boolean)
+  const cleanContent = content.replace(/\n*===人工待办===[\s\S]*?===END===/g, '').trim()
+  return { cleanContent, items }
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ execTaskId: string }> }
@@ -74,12 +85,20 @@ export async function POST(
           text => send({ type: 'chunk', text })
         )
 
+        const { cleanContent, items } = parseActionItems(fullContent)
+
         const [saved] = await prisma.$transaction([
-          prisma.message.create({ data: { execTaskId: task.id, role: 'ASSISTANT', content: fullContent } }),
+          prisma.message.create({ data: { execTaskId: task.id, role: 'ASSISTANT', content: cleanContent } }),
           prisma.execTask.update({ where: { id: task.id }, data: { status: 'WAITING' } }),
         ])
 
-        send({ type: 'done', messageId: saved.id })
+        if (items.length > 0) {
+          await prisma.actionItem.createMany({
+            data: items.map(content => ({ execTaskId: task.id, content })),
+          })
+        }
+
+        send({ type: 'done', messageId: saved.id, actionItems: items })
         controller.close()
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Unknown error'
