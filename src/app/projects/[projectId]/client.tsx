@@ -1,6 +1,8 @@
 'use client'
 
 import { useReducer, useCallback, useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useRouter } from 'next/navigation'
 import { Download, ArrowLeft, BookOpen, Plus, Trash2, Upload, X, MessageCircle, Send } from 'lucide-react'
 import { MindMapButton } from './mindmap'
@@ -666,9 +668,7 @@ export function PlannerClient({ project }: { project: ProjectFull }) {
                     {' · '}流式输出中
                   </div>
                   {state.streamingText ? (
-                    <div className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--p-text)' }}>
-                      {state.streamingText}
-                    </div>
+                    <MarkdownContent content={state.streamingText} />
                   ) : (
                     <div className="flex items-center gap-2 py-1">
                       <div className="flex gap-1">
@@ -1042,6 +1042,41 @@ export function PlannerClient({ project }: { project: ProjectFull }) {
 
 // ── Sub-components ────────────────────────────────────────────────────────
 
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        p: ({ children }) => <p style={{ margin: '0 0 8px', fontSize: '14px', lineHeight: '1.7', color: 'var(--p-text)' }}>{children}</p>,
+        h1: ({ children }) => <h1 style={{ fontSize: '16px', fontWeight: 700, margin: '16px 0 8px', color: 'var(--p-text)' }}>{children}</h1>,
+        h2: ({ children }) => <h2 style={{ fontSize: '15px', fontWeight: 600, margin: '14px 0 6px', color: 'var(--p-text)' }}>{children}</h2>,
+        h3: ({ children }) => <h3 style={{ fontSize: '14px', fontWeight: 600, margin: '12px 0 4px', color: 'var(--p-text)' }}>{children}</h3>,
+        strong: ({ children }) => <strong style={{ fontWeight: 600, color: 'var(--p-text)' }}>{children}</strong>,
+        ul: ({ children }) => <ul style={{ paddingLeft: '18px', margin: '4px 0 8px' }}>{children}</ul>,
+        ol: ({ children }) => <ol style={{ paddingLeft: '18px', margin: '4px 0 8px' }}>{children}</ol>,
+        li: ({ children }) => <li style={{ fontSize: '14px', lineHeight: '1.7', color: 'var(--p-text)', marginBottom: '2px' }}>{children}</li>,
+        code: ({ children, className }) => {
+          const isBlock = !!className
+          return isBlock ? (
+            <code style={{ display: 'block', fontFamily: 'monospace', fontSize: '12px', background: 'var(--p-surface2)', border: '1px solid var(--p-border)', borderRadius: '3px', padding: '10px 12px', overflowX: 'auto', color: 'var(--p-text)', lineHeight: '1.6' }}>{children}</code>
+          ) : (
+            <code style={{ fontFamily: 'monospace', fontSize: '12px', background: 'var(--p-surface2)', border: '1px solid var(--p-border)', borderRadius: '2px', padding: '1px 5px', color: 'var(--p-accent)' }}>{children}</code>
+          )
+        },
+        pre: ({ children }) => <pre style={{ margin: '8px 0', borderRadius: '3px', overflow: 'hidden' }}>{children}</pre>,
+        blockquote: ({ children }) => <blockquote style={{ borderLeft: '3px solid var(--p-accent)', paddingLeft: '12px', margin: '8px 0', color: 'var(--p-text-mid)' }}>{children}</blockquote>,
+        table: ({ children }) => <div style={{ overflowX: 'auto', margin: '8px 0' }}><table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '13px' }}>{children}</table></div>,
+        th: ({ children }) => <th style={{ border: '1px solid var(--p-border)', padding: '6px 12px', background: 'var(--p-surface2)', fontWeight: 600, textAlign: 'left', color: 'var(--p-text)' }}>{children}</th>,
+        td: ({ children }) => <td style={{ border: '1px solid var(--p-border)', padding: '6px 12px', color: 'var(--p-text)' }}>{children}</td>,
+        a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--p-accent)', textDecoration: 'underline' }}>{children}</a>,
+        hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--p-border)', margin: '12px 0' }} />,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  )
+}
+
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string }> = {
     IDLE:    { label: '待机', color: 'var(--p-text-dim)', bg: 'transparent' },
@@ -1102,9 +1137,13 @@ function MessageBubble({ msg, agentNum, agentColor }: { msg: DisplayMessage; age
             {isAI ? `Agent ${agentNum}` : '你'}
           </span>
         </div>
-        <div className="text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--p-text)' }}>
-          {msg.content}
-        </div>
+        {isAI ? (
+          <MarkdownContent content={msg.content} />
+        ) : (
+          <div className="text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--p-text)' }}>
+            {msg.content}
+          </div>
+        )}
       </div>
     </div>
   )
